@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:latest
+    container_name: shieldapi-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    networks:
+      - shield-net
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "4000:4000"
+    depends_on:
+      - redis
+      - user-service
+      - post-service
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - shield-net
+
+  user-service:
+    build: ./services/user-service
+    ports:
+      - "5001:5001"
+    networks:
+      - shield-net
+
+  post-service:
+    build: ./services/post-service
+    ports:
+      - "5002:5002"
+    networks:
+      - shield-net
+  
+networks:
+  shield-net:
+    driver: bridge
+
+# What this file does:
+# This docker-compose file sets up a Redis service that can be used by the API Gateway
+# for rate limiting purposes. The Redis server listens on the default port 6379 and
+# persists data to disk using the append-only file (AOF) mechanism.
+# To start the Redis service, run `docker-compose up -d` in the directory containing this file.
+# Make sure to configure the API Gateway to connect to this Redis instance for rate limiting.
+# Note: Ensure that Docker and Docker Compose are installed on your system to use this file.
+
+# Why docker-compose?
+# Using docker-compose allows for easy management of multi-container Docker applications.
+# It simplifies the process of defining and running multi-container Docker applications
+# by using a single YAML file to configure all services, networks, and volumes.
+# This setup is particularly useful for development and testing environments.
+
+# Additional Notes:
+# - You can customize the Redis configuration further by adding a custom redis.conf file
+#   and mounting it as a volume in the Redis service.
+# - Ensure that the services (gateway, user-service, post-service) are properly configured
+#   to connect to the Redis instance for rate limiting functionality.
