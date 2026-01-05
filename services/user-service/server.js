@@ -10,7 +10,11 @@ app.get('/users/profile', (req, res) => {
     })
 });
 
-app.listen(5001, () => {
+app.get('/health', (req, res) => {
+  res.status(200).send({ status: 'UP' });
+});
+
+app.listen(4000, () => {
     console.log('User Service running on port 5001');
 });
 

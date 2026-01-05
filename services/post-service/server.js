@@ -10,6 +10,10 @@ app.get('/posts', (req, res) => {
     });
 });
 
-app.listen(5002, () => {
+app.get('/health', (req, res) => {
+  res.status(200).send({ status: 'UP' });
+});
+
+app.listen(4000, () => {
     console.log('Post Service running on port 5002');
 });

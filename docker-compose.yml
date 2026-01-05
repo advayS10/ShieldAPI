@@ -16,25 +16,63 @@ services:
       - "4000:4000"
     depends_on:
       - redis
-      - user-service
-      - post-service
+      - user-service-1
+      - user-service-2
+      - user-service-3
+      - post-service-1
+      - post-service-2
+      - post-service-3
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     networks:
       - shield-net
 
-  user-service:
+  user-service-1:
     build: ./services/user-service
+    container_name: user-service-1
     ports:
-      - "5001:5001"
+      - "5001:4000"
     networks:
       - shield-net
 
-  post-service:
-    build: ./services/post-service
+  user-service-2:
+    build: ./services/user-service
+    container_name: user-service-2
     ports:
-      - "5002:5002"
+      - "5002:4000"
+    networks:
+      - shield-net
+
+  user-service-3:
+    build: ./services/user-service
+    container_name: user-service-3
+    ports:
+      - "5003:4000"
+    networks:
+      - shield-net
+
+  post-service-1:
+    build: ./services/post-service
+    container_name: post-service-1
+    ports:
+      - "6001:4000"
+    networks:
+      - shield-net
+
+  post-service-2:
+    build: ./services/post-service
+    container_name: post-service-2
+    ports:
+      - "6002:4000"
+    networks:
+      - shield-net
+
+  post-service-3:
+    build: ./services/post-service
+    container_name: post-service-3
+    ports:
+      - "6003:4000"
     networks:
       - shield-net
   

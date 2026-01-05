@@ -1,11 +1,14 @@
 const axios = require('axios');
 const services = require('../config/services');
+const { getNextServer } = require('../loadbalancer/selector');
 
 const forwardRequest = async (req, res) => {
     try {
         const { service } = req.params;
 
-        const target = services[service];
+        const target = getNextServer(service);
+        console.log(`→ Routed to ${target}`);
+        
         if (!target) {
             return res.status(404).json({ error: 'Service not found' });
         }
