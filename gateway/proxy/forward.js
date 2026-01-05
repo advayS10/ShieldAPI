@@ -1,6 +1,7 @@
 const axios = require('axios');
 const services = require('../config/services');
 const { getNextServer } = require('../loadbalancer/selector');
+const { canRequest, onSuccess, onFailure } = require('../circuitbreaker/breaker');
 
 const forwardRequest = async (req, res) => {
     try {
@@ -13,7 +14,17 @@ const forwardRequest = async (req, res) => {
             return res.status(404).json({ error: 'Service not found' });
         }
 
-        const url = `${target}${req.originalUrl.replace(`/api/${service}`, '')}`;
+        if (!canRequest(target)) {
+            return res.status(503).json({ error: 'Service temporarily unavailable' });
+        }
+
+        const serviceBase = {
+            user: '/users',
+            post: '/posts'
+        };
+
+        const rewrittenPath = req.originalUrl.replace(`/api/${service}`, serviceBase[service]);
+        const url = `${target}${rewrittenPath}`;
 
         const response = await axios({
             method: req.method,
@@ -26,10 +37,15 @@ const forwardRequest = async (req, res) => {
             timeout: 5000
         });
 
+        onSuccess(target);
+
         res.status(response.status).json(response.data);
     }
     catch (error) {
         console.error('Error forwarding request:', error.message);
+
+        onFailure(error.config?.url?.split('/api')[0]);
+
         res.status(502).json({ error: 'Service unavailable' });
     }
 };

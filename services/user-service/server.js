@@ -15,7 +15,7 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(4000, () => {
-    console.log('User Service running on port 5001');
+    console.log('User Service running on port 4000');
 });
 
 /*

@@ -15,5 +15,5 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(4000, () => {
-    console.log('Post Service running on port 5002');
+    console.log('Post Service running on port 4000');
 });
