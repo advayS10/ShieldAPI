@@ -45,3 +45,19 @@ module.exports = {
     onSuccess,
     onFailure
 };
+
+/*
+What This Code Does:
+1. Implements a simple circuit breaker pattern to manage service availability.
+2. Defines three main functions:
+    - `canRequest(serviceUrl)`: Determines if a request can be made to the service based on its circuit state.
+    - `onSuccess(serviceUrl)`: Resets the circuit state to CLOSED on a successful request.
+    - `onFailure(serviceUrl)`: Increments failure count and potentially opens the circuit on repeated failures.
+
+Why These Settings Matter:
+- Failure Threshold: Prevents overwhelming a failing service by opening the circuit after a set number of failures.
+- Cooldown Time: Allows time for a service to recover before attempting to send requests again.
+
+How to Use:
+- Integrate these functions into the request forwarding logic to monitor and control access to downstream services based on their health.
+*/
