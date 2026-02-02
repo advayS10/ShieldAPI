@@ -1,12 +1,17 @@
 const app = require('./app');
 const config = require('./config/env');
+const connectDB = require('./config/db');
 
+const PORT = config.port || 4000;
 
-const PORT = config.port || 3000;
+async function startServer() {
+    await connectDB();
+    app.listen(PORT, () => {
+        console.log(`Gateway server is running on port ${PORT}`);
+    });
+}
 
-app.listen(PORT, () => {
-    console.log(`Gateway server is running on port ${PORT}`);
-});
+startServer()
 
 /*
 What This Code Does:

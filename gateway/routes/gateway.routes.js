@@ -7,35 +7,14 @@ const authenticateJWT = require("../middleware/auth");
 const rbac = require("../middleware/rbac");
 const rateLimiter = require("../middleware/rateLimiter");
 const forwardRequest = require("../proxy/forward");
+const authController  = require('../controllers/authController')
 
-// Dummy user data for demonstration purposes
-const users = [
-  { id: 1, username: 'admin', password: 'admin123', role: ROLES.ADMIN },
-  { id: 2, username: 'user', password: 'user123', role: ROLES.USER },
-  { id: 3, username: 'service', password: 'service123', role: ROLES.SERVICE },
-];
+const { signup, login } = authController;
 
 // Login route  (Public)
-router.post("/login", (req, res) => {
-  const { username, password } = req.body;
+router.post("/login", login);
 
-  const user = users.find(
-    (u) => u.username === username && u.password === password
-  );
-
-  if (!user) {
-    return res.status(401).json({ message: "Invalid credentials" });
-  }
-
-  const token = jwt.sign(
-    { id: user.id, username: user.username, role: user.role },
-    jwtSecret,
-    { expiresIn: jwtExpiresIn }
-  );
-  console.log("Generated token:", token);
-  res.json({ token });
-});
-
+router.post("/signup", signup);
 
 // admin route
 router.get("/admin", authenticateJWT, rateLimiter, rbac([ROLES.ADMIN]), (req, res) => {
