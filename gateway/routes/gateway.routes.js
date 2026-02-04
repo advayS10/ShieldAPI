@@ -8,13 +8,14 @@ const rbac = require("../middleware/rbac");
 const rateLimiter = require("../middleware/rateLimiter");
 const forwardRequest = require("../proxy/forward");
 const authController  = require('../controllers/authController')
+const authRateLimiter = require('../middleware/authRateLimiter')
 
 const { signup, login } = authController;
-
+const { loginLimiter, signupLimiter } = authRateLimiter;
 // Login route  (Public)
-router.post("/login", login);
+router.post("/login", loginLimiter, rateLimiter, login);
 
-router.post("/signup", signup);
+router.post("/signup", signupLimiter, rateLimiter, signup);
 
 // admin route
 router.get("/admin", authenticateJWT, rateLimiter, rbac([ROLES.ADMIN]), (req, res) => {

@@ -1,8 +1,8 @@
 const RATE_LIMITS = {
-    ADMIN: { tokens: 100, refilRate: 100 },
-    USER: { tokens: 20, refilRate: 20 },
-    SERVICE: { tokens: 200, refilRate: 200 },
-    GUEST: { tokens: 5, refilRate: 5 },
+  ADMIN: { tokens: 100, refilRate: 100 },
+  USER: { tokens: 20, refilRate: 20 },
+  SERVICE: { tokens: 200, refilRate: 200 },
+  GUEST: { tokens: 30, refilRate: 30 },
 };
 
 module.exports = RATE_LIMITS;

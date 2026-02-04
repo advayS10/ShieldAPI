@@ -11,10 +11,23 @@ exports.signup = async (req, res) => {
       return res.status(400).json({ message: "Fields are missing" });
     }
 
-    const user = await Auth.findOne({ email });
+    const emailNormalized = email.toLowerCase().trim();
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailNormalized)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    const user = await Auth.findOne({ email: emailNormalized });
 
     if (user) {
       return res.status(409).json({ message: "User already signed up" });
+    }
+
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters" });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -43,18 +56,35 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "Fields are missing" });
     }
 
-    const user = await Auth.findOne({ email });
+    const emailNormalized = email.toLowerCase().trim();
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailNormalized)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    const user = await Auth.findOne({ email: emailNormalized });
 
     if (!user) {
-      return res.status(404).json({ message: "User not signed up" });
+      return res.status(404).json({ message: "Invalid email or password" });
+    }
+
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters" });
     }
 
     const userPassword = user.password;
 
-    const validUser = await bcrypt.compare(userPassword, password);
+    const validUser = await bcrypt.compare(password, userPassword);
 
     if (!validUser) {
-      return res.status(401).json({ message: "Password doesn't match" });
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    if (!jwtSecret) {
+      throw new Error("JWT_SECRET is not defined");
     }
 
     const token = jwt.sign({ id: user._id, role: user.role }, jwtSecret, {
