@@ -7,8 +7,8 @@ const authenticateJWT = require("../middleware/auth");
 const rbac = require("../middleware/rbac");
 const rateLimiter = require("../middleware/rateLimiter");
 const forwardRequest = require("../proxy/forward");
-const authController  = require('../controllers/authController')
-const authRateLimiter = require('../middleware/authRateLimiter')
+const authController = require("../controllers/authController");
+const authRateLimiter = require("../middleware/authRateLimiter");
 
 const { signup, login } = authController;
 const { loginLimiter, signupLimiter } = authRateLimiter;
@@ -19,20 +19,19 @@ router.post("/login", loginLimiter, rateLimiter, login);
 router.post("/signup", signupLimiter, rateLimiter, signup);
 
 router.use(
-  '/revcode',
+  "/revcode",
   authenticateJWT,
   rbac([ROLES.ADMIN, ROLES.USER]),
   rateLimiter,
   (req, res) => {
-    req.params.service = 'revcode';
+    req.params.service = "revcode";
     forwardRequest(req, res);
-  }
-)
+  },
+);
 
-router.get('/health', (req, res) => {
-  res.json({ status: 'gateway-ok' });
+router.get("/health", (req, res) => {
+  res.json({ status: "gateway-ok" });
 });
-
 
 /*
 // User Service
