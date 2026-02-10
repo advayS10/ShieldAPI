@@ -1,23 +1,35 @@
-const jwt = require('jsonwebtoken');
-const config = require('../config/env');
+const jwt = require("jsonwebtoken");
+const config = require("../config/env");
+const Auth = require("../models/Auth");
 
-const authenticateJWT = (req, res, next) => {
+const authenticateJWT = async (req, res, next) => {
+  try {
     const authHeader = req.headers.authorization;
     // console.log('Auth Header:', authHeader);
-    
-    if(authHeader){
-        const token = authHeader.split(' ')[1];
 
-        jwt.verify(token, config.jwtSecret, (err, user) => {
-            if(err){
-                return res.sendStatus(403); // Forbidden
-            }
-            req.user = user;
-            next();
-        });
-    }else {
-        res.status(401).json({ message: 'Authorization header missing' });
+    if (!authHeader) {
+      res.status(401).json({ message: "Authorization header missing" });
     }
+
+    const token = authHeader.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).json({ message: "No token" });
+    }
+
+    const decoded = jwt.verify(token, config.jwtSecret);
+
+    const user = await Auth.findOne({ _id: decoded.id });
+
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: "Invalid token" });
+  }
 };
 
 module.exports = authenticateJWT;

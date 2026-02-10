@@ -1,53 +1,44 @@
-const axios = require('axios');
-const services = require('../config/services');
-const { getNextServer } = require('../loadbalancer/selector');
-const { canRequest, onSuccess, onFailure } = require('../circuitbreaker/breaker');
+const axios = require("axios");
+const services = require("../config/services");
 
 const forwardRequest = async (req, res) => {
-    try {
-        const { service } = req.params;
+  try {
+    const { service } = req.params;
 
-        const target = getNextServer(service);
-        console.log(`→ Routed to ${target}`);
-        
-        if (!target) {
-            return res.status(404).json({ error: 'Service not found' });
-        }
+    const serviceBase = {
+      user: "/users",
+      post: "/posts",
+      revcode: "/revcode",
+    };
 
-        if (!canRequest(target)) {
-            return res.status(503).json({ error: 'Service temporarily unavailable' });
-        }
+    const rewrittenPath = req.originalUrl.replace(
+      `/api/${service}`,
+      serviceBase[service],
+    );
 
-        const serviceBase = {
-            user: '/users',
-            post: '/posts'
-        };
+    const target = services[service];
 
-        const rewrittenPath = req.originalUrl.replace(`/api/${service}`, serviceBase[service]);
-        const url = `${target}${rewrittenPath}`;
+    const url = `${target}${rewrittenPath}`;
 
-        const response = await axios({
-            method: req.method,
-            url,
-            headers: { 
-                ...req.headers, 
-                'x-user': req.user?.username || 'guest' 
-            },
-            data: req.body,
-            timeout: 5000
-        });
+    const response = await axios({
+      method: req.method,
+      url,
+      headers: {
+        ...req.headers,
+        "x-user-id": req.user._id.toString(),
+      },
+      data: req.body,
+      timeout: 5000,
+    });
 
-        onSuccess(target);
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    console.error("Error forwarding request:", error.message);
 
-        res.status(response.status).json(response.data);
-    }
-    catch (error) {
-        console.error('Error forwarding request:', error.message);
-
-        onFailure(error.config?.url?.split('/api')[0]);
-
-        res.status(502).json({ error: 'Service unavailable' });
-    }
+    res
+      .status(error.response?.status || 500)
+      .json(error.response?.data || { message: "Proxy error" });
+  }
 };
 
 module.exports = forwardRequest;
