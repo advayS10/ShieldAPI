@@ -1,5 +1,6 @@
 const axios = require("axios");
 const services = require("../config/services");
+const { canRequest, onSuccess, onFailure } = require('../circuitbreaker/breaker')
 
 const forwardRequest = async (req, res) => {
   try {
@@ -8,7 +9,7 @@ const forwardRequest = async (req, res) => {
     const serviceBase = {
       user: "/users",
       post: "/posts",
-      revcode: "/revcode",
+      revcode: "/api",
     };
 
     const rewrittenPath = req.originalUrl.replace(
@@ -19,22 +20,34 @@ const forwardRequest = async (req, res) => {
     const target = services[service];
 
     const url = `${target}${rewrittenPath}`;
+    // console.log(target)
+    // console.log(rewrittenPath)
+    // console.log(url)
+
+    if(!canRequest(target)){
+      return res.status(503).json({
+        message: 'Service temporarily unavailable'
+      })
+    }
 
     const response = await axios({
       method: req.method,
       url,
       headers: {
-        ...req.headers,
-        "x-user-id": req.user._id.toString(),
+        authorization: req.headers.authorization,
       },
       data: req.body,
       timeout: 5000,
     });
 
+    // Success: Reset circuit
+    onSuccess(target)
     res.status(response.status).json(response.data);
   } catch (error) {
     console.error("Error forwarding request:", error.message);
-
+    
+    onFailure(target)
+    
     res
       .status(error.response?.status || 500)
       .json(error.response?.data || { message: "Proxy error" });
