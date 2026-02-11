@@ -13,10 +13,12 @@ const authRateLimiter = require("../middleware/authRateLimiter");
 const { signup, login } = authController;
 const { loginLimiter, signupLimiter } = authRateLimiter;
 
-// Login route  (Public)
-router.post("/login", loginLimiter, rateLimiter, login);
+const { validateLogin, validateSignup } = require("../middleware/validation");
 
-router.post("/signup", signupLimiter, rateLimiter, signup);
+// Login route  (Public)
+router.post("/login", validateLogin, loginLimiter, rateLimiter, login);
+
+router.post("/signup", validateSignup, signupLimiter, rateLimiter, signup);
 
 router.use(
   "/revcode",
