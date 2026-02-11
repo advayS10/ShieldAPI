@@ -53,7 +53,7 @@ exports.login = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: "Fields are missing" });
+      return res.status(400).json({ message: "Email and password required" });
     }
 
     const emailNormalized = email.toLowerCase().trim();
@@ -64,22 +64,11 @@ exports.login = async (req, res) => {
     }
 
     const user = await Auth.findOne({ email: emailNormalized });
+    const isValidPassword = user
+      ? await bcrypt.compare(password, user.password)
+      : false;
 
-    if (!user) {
-      return res.status(404).json({ message: "Invalid email or password" });
-    }
-
-    if (password.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Password must be at least 6 characters" });
-    }
-
-    const userPassword = user.password;
-
-    const validUser = await bcrypt.compare(password, userPassword);
-
-    if (!validUser) {
+    if (!user || !isValidPassword) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
@@ -87,11 +76,13 @@ exports.login = async (req, res) => {
       throw new Error("JWT_SECRET is not defined");
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, jwtSecret, {
-      expiresIn: jwtExpiresIn,
-    });
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      jwtSecret,
+      { expiresIn: jwtExpiresIn },
+    );
 
-    return res.status(200).json({ message: "User verified", token });
+    return res.status(200).json({ message: "Login successful", token });
   } catch (err) {
     console.log("Error in login", err);
     res.status(500).json({ message: "Internal Server Error" });
