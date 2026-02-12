@@ -2,32 +2,31 @@ const Auth = require("../models/Auth");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { jwtSecret, jwtExpiresIn } = require("../config/env");
+const { ApiError } = require("../utils/errorHandler");
 
-exports.signup = async (req, res) => {
+exports.signup = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: "Fields are missing" });
+      throw new ApiError(400, "Fields are missing");
     }
 
     const emailNormalized = email.toLowerCase().trim();
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailNormalized)) {
-      return res.status(400).json({ message: "Invalid email format" });
+      throw new ApiError(400, "Invalid email format")
     }
 
     const user = await Auth.findOne({ email: emailNormalized });
 
     if (user) {
-      return res.status(409).json({ message: "User already signed up" });
+      throw new ApiError(409, "Email already exist")
     }
 
     if (password.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Password must be at least 6 characters" });
+      throw new ApiError(400, "Password must be at least 6 characters")
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -43,24 +42,23 @@ exports.signup = async (req, res) => {
 
     return res.status(201).json({ message: "New user created", user: userObj });
   } catch (err) {
-    console.log("Error in Signup", err);
-    res.status(500).json({ message: "Internal Server Error" });
+    next(err);
   }
 };
 
-exports.login = async (req, res) => {
+exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password required" });
+      throw new ApiError(400, "Fields are missing");
     }
 
     const emailNormalized = email.toLowerCase().trim();
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailNormalized)) {
-      return res.status(400).json({ message: "Invalid email format" });
+      throw new ApiError(400, "Invalid email format")
     }
 
     const user = await Auth.findOne({ email: emailNormalized });
@@ -69,7 +67,7 @@ exports.login = async (req, res) => {
       : false;
 
     if (!user || !isValidPassword) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      throw new ApiError(400, "Invalid email or password")
     }
 
     if (!jwtSecret) {
@@ -84,7 +82,6 @@ exports.login = async (req, res) => {
 
     return res.status(200).json({ message: "Login successful", token });
   } catch (err) {
-    console.log("Error in login", err);
-    res.status(500).json({ message: "Internal Server Error" });
+    next(err);
   }
 };

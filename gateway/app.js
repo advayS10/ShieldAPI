@@ -6,9 +6,12 @@ const rateLimiter = require("./middleware/rateLimiter");
 const logger = require("./middleware/logger");
 const { metricsMiddleware, client } = require("./middleware/metrics");
 require("./loadbalancer/healthcheck.js");
+const { ApiError, errorHandler } = require('./utils/errorHandler.js')
+const helmet = require('helmet')
 
 const app = express();
 
+app.use(helmet())
 app.use(cors());
 app.use(logger);
 app.use(metricsMiddleware);
@@ -23,6 +26,7 @@ app.use(bodyParser.json());
 
 // Use the defined routes
 app.use("/api", routes);
+app.use(errorHandler)
 
 app.use(rateLimiter); // Apply rate limiter middleware globally
 

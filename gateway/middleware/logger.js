@@ -1,16 +1,30 @@
 const logger = (req, res, next) => {
     const start = Date.now();
+    const requestId = req.headers['x-request-id'] || generateRequestId();
 
     res.on('finish', () => {
         const duration = Date.now() - start;
-        console.log(
-        `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ` +
-        `${res.statusCode} ${duration}ms`
-        );
-    }
-    );
+        const logLevel = res.statusCode >= 500 ? 'ERROR' : 'INFO';
+
+        console.log(JSON.stringify({
+            timestamp: new Date().toISOString(),
+            requestId,
+            level: logLevel,
+            method: req.method,
+            path: req.originalUrl,
+            statusCode: res.statusCode,
+            duration: `${duration}ms`,
+            userId: req.user?._id || 'anonymous',
+            ip: req.ip,
+        }));
+    });
     next();
 };
+
+function generateRequestId() {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
 module.exports = logger;
 
 /*

@@ -4,7 +4,8 @@ module.exports = {
     port: process.env.PORT || 3000,
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1h',
-    mongodbURI: process.env.MONGODB_URI
+    mongodbURI: process.env.MONGODB_URI,
+    nodeenv: process.env.NODE_ENV || "",
 };
 
 /*
