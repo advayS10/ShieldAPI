@@ -8,6 +8,7 @@ const { metricsMiddleware, client } = require("./middleware/metrics");
 require("./loadbalancer/healthcheck.js");
 const { ApiError, errorHandler } = require('./utils/errorHandler.js')
 const helmet = require('helmet')
+const { globalRateLimiter } = require("./middleware/globalRateLimiter");
 
 const app = express();
 
@@ -25,6 +26,8 @@ app.get("/metrics", async (req, res) => {
 
 // Middleware to parse JSON requests
 app.use(bodyParser.json());
+
+app.use(globalRateLimiter); // Apply global rate limiter to all routes
 
 // Use the defined routes
 app.use("/api", routes);

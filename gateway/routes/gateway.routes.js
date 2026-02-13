@@ -9,10 +9,11 @@ const rateLimiter = require("../middleware/rateLimiter");
 const forwardRequest = require("../proxy/forward");
 const authController = require("../controllers/authController");
 const authRateLimiter = require("../middleware/authRateLimiter");
+const userRateLimiter = require("../middleware/userRateLimiter");
 
 const { signup, login } = authController;
 const { loginLimiter, signupLimiter } = authRateLimiter;
-
+const { userRateLimiter } = userRateLimiter;
 const { validateLogin, validateSignup } = require("../middleware/validation");
 
 // Login route  (Public)
@@ -24,7 +25,7 @@ router.use(
   "/revcode",
   authenticateJWT,
   rbac([ROLES.ADMIN, ROLES.USER]),
-  rateLimiter,
+  userRateLimiter,
   (req, res) => {
     req.params.service = "revcode";
     forwardRequest(req, res);
