@@ -1,6 +1,4 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
-const { jwtSecret, jwtExpiresIn } = require("../config/env");
 const router = express.Router();
 const ROLES = require("../utils/roles");
 const authenticateJWT = require("../middleware/auth");
@@ -13,9 +11,7 @@ const userRateLimiter = require("../middleware/userRateLimiter");
 
 const { signup, login } = authController;
 const { loginLimiter, signupLimiter } = authRateLimiter;
-const { userRateLimiter } = userRateLimiter;
 const { validateLogin, validateSignup } = require("../middleware/validation");
-
 // Login route  (Public)
 router.post("/login", validateLogin, loginLimiter, login);
 

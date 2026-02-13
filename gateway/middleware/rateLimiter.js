@@ -47,22 +47,19 @@ const rateLimiter = ({ getKey, getLimitConfig }) => {
             const identity = getKey(req);
             if(!identity) return next(); 
 
-            const role = getLimitConfig(req);
-            if (!role) return next(); 
+            const limitConfig = getLimitConfig(req);
+            if (!limitConfig) return next();
 
             // Check blocked list in Redis; if Redis fails, fall back to proceeding (safe default: allow)
             try {
                 const isBlocked = await redis.sismember(BLOCKED_IDENTITIES_KEY, identity);
                 if (isBlocked) {
-                    return res.status(403).json({ message: 'Your IP is blocked' });
+                    return res.status(403).json({ message: 'Request blocked' });
                 }
             } catch (err) {
                 console.error('Redis blocked-check error, falling back:', err.message || err);
                 // proceed to fallback below
             }
-
-            const limitConfig = RATE_LIMITS[role];
-            if (!limitConfig) return next();
 
             const key = `rate:${limitConfig.name}:${identity}`;
             const now = Math.floor(Date.now() / 1000);

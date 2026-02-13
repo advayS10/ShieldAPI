@@ -1,3 +1,5 @@
+const rateLimiter = require("./rateLimiter");
+
 const ROLE_LIMITS = {
     ADMIN: { tokens: 100, refillRate: 100 },
     USER: { tokens: 20, refillRate: 20 },
@@ -5,14 +7,14 @@ const ROLE_LIMITS = {
     GUEST: { tokens: 30, refillRate: 30 },
 }
 
-exports.userRateLimiter = rateLimiter({
+const userRateLimiter = rateLimiter({
     getKey: (req) => {
         return req.user ? req.user.id : req.ip;
     },
     getLimitConfig: (req) => {
         const role = (req.user?.role || 'GUEST').toUpperCase();
-        const config = ROLE_LIMITS[role];
-        if (!config) return null;
-        return { name: role, ...config }; 
+        return ROLE_LIMITS[role] ? { name: role, ...ROLE_LIMITS[role] } : null;
     }
 });
+
+module.exports = userRateLimiter;
