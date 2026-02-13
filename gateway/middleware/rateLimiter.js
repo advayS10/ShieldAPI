@@ -1,61 +1,111 @@
 const redis = require('../config/redis');
 const RATE_LIMITS = require('../utils/rateLimits');
 
-const BLOCKED_IP_KEY = 'blocked:ips';
+const BLOCKED_IDENTITIES_KEY = 'blocked:identities';
 const WINDOW_SIZE_IN_SECONDS = 60; // 1 minute window
+
+// In-memory fallback bucket map used when Redis is unavailable or slow.
+// Keyed by `${role}:${identity}` -> { tokens, lastRefill, lastSeen }
+const inMemoryBuckets = new Map();
+const IN_MEMORY_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function cleanupInMemoryBuckets() {
+    const now = Date.now();
+    for (const [k, v] of inMemoryBuckets.entries()) {
+        if (now - v.lastSeen > IN_MEMORY_TTL_MS) inMemoryBuckets.delete(k);
+    }
+}
+
+// Perform periodic cleanup to avoid memory leak
+setInterval(cleanupInMemoryBuckets, IN_MEMORY_TTL_MS).unref();
+
+function getInMemoryBucket(key, limitConfig) {
+    const now = Math.floor(Date.now() / 1000);
+    let b = inMemoryBuckets.get(key);
+    if (!b) {
+        b = { tokens: limitConfig.tokens, lastRefill: now, lastSeen: Date.now() };
+        inMemoryBuckets.set(key, b);
+        return b;
+    }
+
+    // refill logic (same as Redis-backed)
+    const elapsed = now - b.lastRefill;
+    if (elapsed > 0) {
+        const refill = Math.floor((elapsed / WINDOW_SIZE_IN_SECONDS) * limitConfig.refillRate);
+        if (refill > 0) {
+            b.tokens = Math.min(b.tokens + refill, limitConfig.tokens);
+            b.lastRefill = now;
+        }
+    }
+    b.lastSeen = Date.now();
+    return b;
+}
 
 const rateLimiter = async (req, res, next) => {
     try {
-        const ip = req.ip;
+        const identity = req.user ? req.user.id : req.ip;
         const role = (req.user?.role || 'GUEST').toUpperCase();
 
-        const isBlocked = await redis.sismember(BLOCKED_IP_KEY, ip);
-        if (isBlocked) {
-            return res.status(403).json({
-                message: 'Your IP is blocked',
-            });
+        // Check blocked list in Redis; if Redis fails, fall back to proceeding (safe default: allow)
+        try {
+            const isBlocked = await redis.sismember(BLOCKED_IDENTITIES_KEY, identity);
+            if (isBlocked) {
+                return res.status(403).json({ message: 'Your IP is blocked' });
+            }
+        } catch (err) {
+            console.error('Redis blocked-check error, falling back:', err.message || err);
+            // proceed to fallback below
         }
 
         const limitConfig = RATE_LIMITS[role];
         if (!limitConfig) return next();
 
-        const key = `rate:${role}:${ip}`;
+        const key = `rate:${role}:${param}`;
         const now = Math.floor(Date.now() / 1000);
 
-        let { tokens, lastRefill } = await redis.hgetall(key); // hgetall retrieve all field value pair for particular key as strings 
+        // Try Redis-backed token bucket first; if Redis fails, use in-memory fallback
+        try {
+            let { tokens, lastRefill } = await redis.hgetall(key);
 
-        tokens = tokens ? parseInt(tokens, 10) : limitConfig.tokens; // if no tokens, set to max tokens
-        lastRefill = lastRefill ? parseInt(lastRefill, 10) : now; // if no lastRefill, set to now
+            tokens = tokens ? parseInt(tokens, 10) : limitConfig.tokens;
+            lastRefill = lastRefill ? parseInt(lastRefill, 10) : now;
 
-        const elapsed = now - lastRefill; // time since last refill in seconds
-        
-        if (elapsed > 0) { 
-            const refill = Math.floor(
-                (elapsed / WINDOW_SIZE_IN_SECONDS) * limitConfig.refillRate
-            ); // calculate how many tokens to refill based on elapsed time
-            
-            if (refill > 0) {
-                tokens = Math.min(tokens + refill, limitConfig.tokens);
-                lastRefill = now;
-            } // update lastRefill time
+            const elapsed = now - lastRefill;
+            if (elapsed > 0) {
+                const refill = Math.floor(
+                    (elapsed / WINDOW_SIZE_IN_SECONDS) * limitConfig.refillRate
+                );
+                if (refill > 0) {
+                    tokens = Math.min(tokens + refill, limitConfig.tokens);
+                    lastRefill = now;
+                }
+            }
+
+            if (tokens <= 0) return res.status(429).json({ message: 'Rate limit exceeded' });
+
+            tokens -= 1;
+
+            await redis.hmset(key, { tokens, lastRefill });
+            await redis.expire(key, WINDOW_SIZE_IN_SECONDS * 2);
+
+            return next();
+        } catch (redisError) {
+            // Redis failed: use in-memory fallback token bucket
+            console.error('Redis error in rateLimiter, using in-memory fallback:', redisError.message || redisError);
+
+            const memKey = `${role}:${identity}`;
+            const bucket = getInMemoryBucket(memKey, limitConfig);
+
+            if (bucket.tokens <= 0) {
+                return res.status(429).json({ message: 'Rate limit exceeded (fallback)' });
+            }
+
+            bucket.tokens -= 1;
+            return next();
         }
-
-        if (tokens <= 0) {
-            return res.status(429).json({ message: 'Rate limit exceeded' });
-        }
-
-        tokens -= 1;
-
-        await redis.hmset(key, { // hmset set multiple field value pair for particular key
-            tokens,
-            lastRefill,
-        });
-
-        await redis.expire(key, WINDOW_SIZE_IN_SECONDS * 2); // set expiration to avoid memory leaks
-
-        next();
     } catch (error) {
         console.error('Rate limiter error:', error);
+        // Last resort: allow the request to avoid blocking critical traffic
         next();
     }
 };
@@ -67,19 +117,4 @@ redis-cli
 SADD blocked:ips 127.0.0.1
 */
 
-/*
-What this file does?
-This file implements a rate limiting middleware for an API gateway using Redis as the backend store. It checks the number of requests made by a user (identified by their IP address and role) within a specified time window and restricts access if the limit is exceeded. It also checks if the user's IP is blocked.
-If the IP is blocked, it responds with a 403 status code. If the user exceeds their rate limit, it responds with a 429 status code. Otherwise, it allows the request to proceed.
 
-How does it work?
-1. It retrieves the user's IP address and role from the request.
-2. It checks if the IP is in the blocked list stored in Redis.
-3. It fetches the current token count and last refill time from Redis.
-4. It calculates the number of tokens to refill based on the elapsed time since the last refill.
-5. If the user has tokens available, it decrements the token count and allows the request to proceed. If not, it responds with a rate limit exceeded message.
-6. The token count and last refill time are updated in Redis with an expiration time to manage memory usage.
-
-Why is it needed?
-Rate limiting is essential to protect APIs from abuse, ensure fair usage among users, and maintain the overall performance and availability of the service. By implementing rate limiting based on user roles, the system can provide differentiated access levels, allowing more privileged users (like admins) to have higher limits compared to regular users or guests.
-*/
